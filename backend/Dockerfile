@@ -1,5 +1,5 @@
 # ----------------------
-# Stage 1: Dependencies (cài tất cả deps để build)
+# Stage 1: Dependencies 
 # ----------------------
 FROM node:20-alpine AS deps
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig*.json ./
 
-# Cài dependencies (ci để deterministic, nhanh hơn install)
+# Cài dependencies 
 RUN npm ci
 
 # ----------------------
@@ -19,18 +19,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy deps từ stage trước (cache tốt)
+# Copy deps từ stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build NestJS → tạo thư mục dist/
+# Build NestJS tạo thư mục dist/
 RUN npm run build
 
 # Xóa devDependencies để chỉ giữ production deps
 RUN npm prune --production
 
 # ----------------------
-# Stage 3: Production runtime (image cuối cùng nhỏ gọn)
+# Stage 3: Production runtime 
 # ----------------------
 FROM node:20-alpine AS runner
 
@@ -48,9 +48,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 # Chuyển sang user non-root
 USER nestjs
 
-# Expose port (Render sẽ dùng biến $PORT, document ở đây)
+# Expose port
 EXPOSE ${PORT:-3000}
 
-# Chạy ứng dụng (dùng node trực tiếp dist/main.js)
+# Chạy ứng dụng 
 ENV NODE_ENV=production
 CMD ["node", "dist/main.js"]

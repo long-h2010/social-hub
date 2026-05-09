@@ -26,6 +26,87 @@ const ChatDisplay: React.FC<Props> = ({
   ref,
   onCall
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageItems, setImageItems] = useState<ImageItem[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).filter((f) =>
+      f.type.startsWith('image/'),
+    );
+    if (!files.length) return;
+
+    // Giới hạn tổng không quá 5 ảnh
+    const remaining = 5 - imageItems.length;
+    const accepted = files.slice(0, remaining);
+
+    accepted.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImageItems((prev) => [
+          ...prev,
+          { file, preview: reader.result as string },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSend = async () => {
+    const hasImages = imageItems.length > 0;
+    const hasText = messageInput.trim();
+
+    if (!hasImages && !hasText) return;
+
+    if (hasImages) {
+      try {
+        setUploading(true);
+
+        const formData = new FormData();
+        // BE dùng FilesInterceptor('images') nên field name là 'images'
+        imageItems.forEach((item) => formData.append('images', item.file));
+
+        // Gửi text và chatId kèm theo trong cùng request
+        formData.append('chatId', chat.id);
+        if (hasText) formData.append('message', messageInput.trim());
+
+        const res = await AxiosClient.post(
+          import.meta.env.VITE_APP_MESSAGE_ENDPOINT,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } },
+        );
+
+        // BE trả về message đã tạo — gọi handler để cập nhật UI qua socket/state
+        handleSendMessage(chat.id, res.data.images);
+      } catch (err) {
+        console.error('Image upload failed:', err);
+      } finally {
+        setUploading(false);
+        setImageItems([]);
+        setMessageInput('');
+      }
+      return;
+    }
+
+    handleSendMessage(chat.id);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) handleSend();
+  };
+
+  const canSend = (!!messageInput.trim() || imageItems.length > 0) && !uploading;
+
   return (
     <div className='flex-1 flex flex-col bg-white'>
       <ChatHeader chat={chat} onCall={onCall} />

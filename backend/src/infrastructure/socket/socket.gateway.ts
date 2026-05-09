@@ -58,6 +58,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const sendMsgData = {
       sendTo: body.sendTo,
       message: body.message,
+      images: body.images,
     };
 
     const message = await this.msgService.sendMessage(
@@ -76,14 +77,12 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const uid = Math.floor(Math.random() * 100000000);
     const tokenAgora = generateAgoraToken(body.chatId, uid);
 
-    this.server
-      .to(`user:${body.caller.id}`)
-      .emit('calling', {
-        caller: body.caller,
-        channel: body.chatId,
-        token: tokenAgora,
-        uid: uid,
-      });
+    this.server.to(`user:${body.caller.id}`).emit('calling', {
+      caller: body.caller,
+      channel: body.chatId,
+      token: tokenAgora,
+      uid: uid,
+    });
 
     this.server
       .to(`user:${body.callee}`)

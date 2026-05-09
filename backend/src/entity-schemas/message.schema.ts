@@ -14,6 +14,9 @@ export class Message {
   @Prop()
   message: string;
 
+  @Prop()
+  images: string[];
+
   @Prop([{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }])
   readed: User[];
 }

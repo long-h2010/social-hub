@@ -5,6 +5,8 @@ class SendMessageDto {
 
   @IsNotEmpty()
   message: string;
+
+  images?: string[];
 }
 
 export default SendMessageDto;

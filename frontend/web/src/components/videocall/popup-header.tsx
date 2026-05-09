@@ -2,15 +2,15 @@ import { MinimizeIcon, X } from 'lucide-react';
 import { IconButton } from '../common';
 
 interface Props {
-  connecting: boolean;
+  connected: boolean; // true = đã kết nối, false = đang kết nối
   sharing: boolean;
-  timer: any;
+  timer: string;
   onMinimize: () => void;
   handleEnd: () => void;
 }
 
 const PopupHeader: React.FC<Props> = ({
-  connecting,
+  connected,
   sharing,
   timer,
   onMinimize,
@@ -21,12 +21,13 @@ const PopupHeader: React.FC<Props> = ({
       <div className='flex items-center gap-2.5'>
         <span
           className='w-2 h-2 rounded-full inline-block animate-[vcPulse_1.5s_infinite]'
-          style={{ background: connecting ? '#34d399' : '#f59e0b' }}
+          style={{ background: connected ? '#34d399' : '#f59e0b' }}
         />
         <span className='text-white/60 text-[13px] font-mono tracking-[3px]'>
-          {connecting ? timer : 'Đang kết nối…' }
+          {/* Khi connected hiển thị timer, khi chưa kết nối hiển thị trạng thái */}
+          {connected ? timer : 'Đang kết nối…'}
         </span>
-        {sharing && connecting && (
+        {sharing && connected && (
           <span className='text-[11px] px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25'>
             Đang chia sẻ
           </span>

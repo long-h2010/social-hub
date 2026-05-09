@@ -4,9 +4,13 @@ import useTimer from '../../hooks/use-timer';
 import { useCall } from '../../contexts/call-context';
 import { ControlButtons, PopupHeader, VideoArea } from './';
 import AgoraRTC from 'agora-rtc-sdk-ng';
-import type { IAgoraRTCClient, IAgoraRTCRemoteUser } from 'agora-rtc-sdk-ng';
-
-// type Speaker = 'remote' | 'local';
+import type {
+  IAgoraRTCClient,
+  IAgoraRTCRemoteUser,
+  IMicrophoneAudioTrack,
+  ICameraVideoTrack,
+  ILocalVideoTrack,
+} from 'agora-rtc-sdk-ng';
 
 interface Props {
   isOpen: boolean;
@@ -26,46 +30,52 @@ const CallPopup: React.FC<Props> = ({
   callee,
   minimized,
   onMinimize,
-  // onExpand,
 }) => {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
-  const [localTrack, setLocalTrack] = useState<any>(null);
+
+  // Lưu riêng audio và video track để có thể bật/tắt
+  const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
+  const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null);
+  const screenTrackRef = useRef<ILocalVideoTrack | null>(null);
+
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
 
-  const [remoteUser, setRemoteUser] = useState<IAgoraRTCRemoteUser | null>(
-    null,
-  );
+  const [remoteUser, setRemoteUser] = useState<IAgoraRTCRemoteUser | null>(null);
 
   const { incomingCall, callStatus, setCallStatus } = useCall();
-  const [muted, setMuted] = useState<boolean>(false);
-  const [videoOff, setVideoOff] = useState<boolean>(false);
-  const [sharing, setSharing] = useState<boolean>(false);
-  // const [speaking, setSpeaking] = useState<Speaker>('remote');
+  const [muted, setMutedState] = useState<boolean>(false);
+  const [videoOff, setVideoOffState] = useState<boolean>(false);
+  const [sharing, setSharingState] = useState<boolean>(false);
   const [visible, setVisible] = useState<boolean>(false);
-  const [connecting, setConnecting] = useState<boolean>(false);
 
-  const timer = useTimer(isOpen && !connecting);
+  // "connecting" = true khi đang đổ chuông / chờ kết nối
+  // "connected"  = true sau khi in-call và join xong
+  const [connected, setConnected] = useState<boolean>(false);
 
+  // Timer chỉ chạy khi đã connected
+  const timer = useTimer(connected);
+
+  // Khi callStatus chuyển sang 'in-call' => bắt đầu join Agora
   useEffect(() => {
-    if (callStatus == 'in-call') setConnecting(true);
+    if (callStatus === 'in-call') {
+      startCall();
+    }
   }, [callStatus]);
 
+  // Khởi tạo AGORA_CLIENT listeners
   useEffect(() => {
     clientRef.current = AGORA_CLIENT;
 
-    AGORA_CLIENT.on(
-      'user-published',
-      async (user: IAgoraRTCRemoteUser, mediaType) => {
-        await AGORA_CLIENT.subscribe(user, mediaType);
-        if (mediaType === 'video') {
-          setRemoteUser(user);
-        }
-        if (mediaType === 'audio' && user.audioTrack) {
-          user.audioTrack.play();
-        }
-      },
-    );
+    AGORA_CLIENT.on('user-published', async (user: IAgoraRTCRemoteUser, mediaType) => {
+      await AGORA_CLIENT.subscribe(user, mediaType);
+      if (mediaType === 'video') {
+        setRemoteUser(user);
+      }
+      if (mediaType === 'audio' && user.audioTrack) {
+        user.audioTrack.play();
+      }
+    });
 
     AGORA_CLIENT.on('user-unpublished', (user) => {
       if (remoteUser?.uid === user.uid) setRemoteUser(null);
@@ -73,13 +83,27 @@ const CallPopup: React.FC<Props> = ({
 
     AGORA_CLIENT.on('user-left', () => {
       setRemoteUser(null);
-      onClose?.();
+      handleEnd();
     });
 
     return () => {
       AGORA_CLIENT.removeAllListeners();
     };
   }, [onClose]);
+
+  // Phát video remote khi có
+  useEffect(() => {
+    if (remoteUser?.videoTrack && remoteVideoRef.current) {
+      remoteUser.videoTrack.play(remoteVideoRef.current);
+    }
+  }, [remoteUser]);
+
+  // Phát video local khi có
+  useEffect(() => {
+    if (localVideoTrackRef.current && localVideoRef.current) {
+      localVideoTrackRef.current.play(localVideoRef.current);
+    }
+  }, [connected]);
 
   // Join channel & publish tracks
   const startCall = useCallback(async () => {
@@ -93,76 +117,148 @@ const CallPopup: React.FC<Props> = ({
     try {
       await clientRef.current.join(
         APP_ID,
-        incomingCall?.channel,
-        incomingCall?.token,
-        incomingCall?.uid,
+        incomingCall.channel,
+        incomingCall.token,
+        incomingCall.uid,
       );
 
       const localAudio = await AgoraRTC.createMicrophoneAudioTrack();
       const localVideo = await AgoraRTC.createCameraVideoTrack();
-      setLocalTrack(localVideo);
+
+      localAudioTrackRef.current = localAudio;
+      localVideoTrackRef.current = localVideo;
 
       await clientRef.current.publish([localAudio, localVideo]);
+
+      // Sau khi publish xong mới coi là connected
+      setConnected(true);
+
+      if (localVideoRef.current) {
+        localVideo.play(localVideoRef.current);
+      }
     } catch (err) {
       console.error('Start Agora call failed:', err);
     }
   }, [APP_ID, incomingCall?.channel, incomingCall?.token, incomingCall?.uid]);
 
-  useEffect(() => {
-    if (localTrack && localVideoRef.current) {
-      localTrack.play(localVideoRef.current);
-    }
-  }, [localTrack]);
-
-  // Leave call
+  // Leave call & dọn dẹp tracks
   const endCall = useCallback(async () => {
+    // Dừng và đóng screen share nếu đang share
+    if (screenTrackRef.current) {
+      screenTrackRef.current.stop();
+      screenTrackRef.current.close();
+      screenTrackRef.current = null;
+    }
+
+    // Dừng và đóng local tracks
+    if (localAudioTrackRef.current) {
+      localAudioTrackRef.current.stop();
+      localAudioTrackRef.current.close();
+      localAudioTrackRef.current = null;
+    }
+    if (localVideoTrackRef.current) {
+      localVideoTrackRef.current.stop();
+      localVideoTrackRef.current.close();
+      localVideoTrackRef.current = null;
+    }
+
     if (clientRef.current) {
       await clientRef.current.leave();
     }
+
     setRemoteUser(null);
+    setConnected(false);
     onClose?.();
   }, [onClose]);
 
-  // Reset state when a new call opens
+  // Reset state khi popup mở
   useEffect(() => {
     if (isOpen) {
-      setMuted(false);
-      setVideoOff(false);
-      setSharing(false);
+      setMutedState(false);
+      setVideoOffState(false);
+      setSharingState(false);
+      setConnected(false);
 
       const t = setTimeout(() => setVisible(true), 10);
-
-      startCall();
-
-      return () => {
-        clearTimeout(t);
-      };
+      return () => clearTimeout(t);
     } else {
       setVisible(false);
     }
   }, [isOpen]);
 
-  // useEffect(() => {
-  //   if (!isOpen || !connecting) return;
-  //   const t = setTimeout(() => setConnecting(false), 2200);
-  //   return () => clearTimeout(t);
-  // }, [isOpen, connecting]);
+  // ─── Handlers có thực tế điều khiển Agora tracks ───────────────────────────
 
-  // useEffect(() => {
-  //   if (!isOpen || connecting) return;
-  //   const id = setInterval(
-  //     () => setSpeaking((s) => (s === 'remote' ? 'local' : 'remote')),
-  //     2800,
-  //   );
-  //   return () => clearInterval(id);
-  // }, [isOpen, connecting]);
-
-  // Play remote video
-  useEffect(() => {
-    if (remoteUser?.videoTrack && remoteVideoRef.current) {
-      remoteUser.videoTrack.play(remoteVideoRef.current);
+  const handleSetMuted = (value: boolean) => {
+    setMutedState(value);
+    if (localAudioTrackRef.current) {
+      localAudioTrackRef.current.setEnabled(!value);
     }
-  }, [remoteUser]);
+  };
+
+  const handleSetVideoOff = async (value: boolean) => {
+    setVideoOffState(value);
+    if (!localVideoTrackRef.current) return;
+
+    await localVideoTrackRef.current.setEnabled(!value);
+
+    // Sau khi bật lại cam, Agora đã detach khỏi div → cần play lại
+    if (!value && localVideoRef.current) {
+      localVideoTrackRef.current.play(localVideoRef.current);
+    }
+  };
+
+  const handleSetSharing = async (value: boolean) => {
+    if (!clientRef.current) return;
+
+    if (value) {
+      // Bắt đầu share màn hình
+      try {
+        const screenTrack = await AgoraRTC.createScreenVideoTrack(
+          { encoderConfig: '1080p_1' },
+          'disable',
+        ) as ILocalVideoTrack;
+
+        screenTrackRef.current = screenTrack;
+
+        // Unpublish camera, publish screen
+        if (localVideoTrackRef.current) {
+          await clientRef.current.unpublish(localVideoTrackRef.current);
+        }
+        await clientRef.current.publish(screenTrack);
+
+        // Phát preview local
+        if (localVideoRef.current) {
+          screenTrack.play(localVideoRef.current);
+        }
+
+        // Tự động tắt sharing khi user dừng từ browser
+        (screenTrack as any).on?.('track-ended', () => {
+          handleSetSharing(false);
+        });
+
+        setSharingState(true);
+      } catch (err) {
+        console.error('Screen share failed:', err);
+      }
+    } else {
+      // Dừng share màn hình, quay về camera
+      if (screenTrackRef.current) {
+        await clientRef.current.unpublish(screenTrackRef.current);
+        screenTrackRef.current.stop();
+        screenTrackRef.current.close();
+        screenTrackRef.current = null;
+      }
+
+      if (localVideoTrackRef.current) {
+        await clientRef.current.publish(localVideoTrackRef.current);
+        if (localVideoRef.current) {
+          localVideoTrackRef.current.play(localVideoRef.current);
+        }
+      }
+
+      setSharingState(false);
+    }
+  };
 
   const handleEnd = () => {
     setCallStatus('idle');
@@ -171,12 +267,10 @@ const CallPopup: React.FC<Props> = ({
     setTimeout(onClose, 280);
   };
 
-  // Minimized pill is rendered at App level — nothing here when minimized
   if (!isOpen) return null;
   if (minimized) return null;
 
   return (
-    // ✅ pointer-events-none on the backdrop prevents blocking the chat
     <div
       className='fixed inset-0 z-[50000] flex items-center justify-center transition-opacity duration-300'
       style={{
@@ -190,7 +284,7 @@ const CallPopup: React.FC<Props> = ({
         style={{ animation: 'vcModalIn 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}
       >
         <PopupHeader
-          connecting={connecting}
+          connected={connected}
           sharing={sharing}
           timer={timer}
           onMinimize={onMinimize}
@@ -201,20 +295,19 @@ const CallPopup: React.FC<Props> = ({
           localRef={localVideoRef}
           remoteRef={remoteVideoRef}
           callee={callee}
-          connecting={connecting}
+          connected={connected}
           muted={muted}
           videoOff={videoOff}
-          // speaking={speaking}
         />
 
         <ControlButtons
-          connecting={connecting}
+          connected={connected}
           muted={muted}
-          setMuted={setMuted}
+          setMuted={handleSetMuted}
           videoOff={videoOff}
-          setVideoOff={setVideoOff}
+          setVideoOff={handleSetVideoOff}
           sharing={sharing}
-          setSharing={setSharing}
+          setSharing={handleSetSharing}
           handleEnd={handleEnd}
         />
       </div>

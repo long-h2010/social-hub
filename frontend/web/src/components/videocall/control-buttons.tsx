@@ -48,18 +48,18 @@ function CtrlBtn({
 }
 
 interface Props {
-  connecting: boolean;
+  connected: boolean; // true = đã kết nối
   muted: boolean;
   setMuted: (value: boolean) => void;
   videoOff: boolean;
   setVideoOff: (value: boolean) => void;
   sharing: boolean;
-  setSharing: (value: boolean) => void;
+  setSharing: (value: boolean) => Promise<void>;
   handleEnd: () => void;
 }
 
 const ControlButtons: React.FC<Props> = ({
-  connecting,
+  connected,
   muted,
   setMuted,
   videoOff,
@@ -70,34 +70,43 @@ const ControlButtons: React.FC<Props> = ({
 }) => {
   return (
     <div className='flex items-center justify-center gap-6 px-6 py-[18px] border-t border-white/[0.05]'>
+      {/* Mic - luôn hiển thị */}
       <CtrlBtn
         onClick={() => setMuted(!muted)}
         inactive={muted}
         label={muted ? 'Bật mic' : 'Tắt mic'}
       >
-        {muted ? <MicOffIcon /> : <MicIcon />}
+        {muted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
       </CtrlBtn>
+
+      {/* Camera - luôn hiển thị */}
       <CtrlBtn
         onClick={() => setVideoOff(!videoOff)}
         inactive={videoOff}
         label={videoOff ? 'Bật cam' : 'Tắt cam'}
       >
-        {videoOff ? <VideoOffIcon /> : <VideoIcon />}
+        {videoOff ? <VideoOffIcon size={18} /> : <VideoIcon size={18} />}
       </CtrlBtn>
-      {!connecting && (
+
+      {/* Share màn hình - chỉ khi connected */}
+      {connected && (
         <CtrlBtn
           onClick={() => setSharing(!sharing)}
           inactive={sharing}
-          label='Màn hình'
+          label={sharing ? 'Dừng chia sẻ' : 'Màn hình'}
         >
-          <ShareIcon />
+          <ShareIcon size={18} />
         </CtrlBtn>
       )}
-      {!connecting && (
+
+      {/* Thêm - chỉ khi connected */}
+      {connected && (
         <CtrlBtn onClick={() => {}} label='Thêm'>
-          <MoreHorizontal />
+          <MoreHorizontal size={18} />
         </CtrlBtn>
       )}
+
+      {/* Kết thúc - luôn hiển thị */}
       <CtrlBtn onClick={handleEnd} danger label='Kết thúc'>
         <span className='rotate-[135deg] inline-flex'>
           <PhoneIcon size={18} />

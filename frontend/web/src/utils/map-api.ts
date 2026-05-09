@@ -74,5 +74,6 @@ export const mapMessageApi = (msg: any): Message => ({
     avatar: msg.sender?.avatar,
   },
   content: msg.message,
+  images: msg.images,
   time: msg.createdAt,
 });

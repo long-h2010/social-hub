@@ -1,9 +1,7 @@
-# Stage 1: Build React app
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files trước để cache layer tốt hơn
 COPY package*.json ./
 
 RUN npm ci

@@ -121,10 +121,13 @@ const Messenger: React.FC = () => {
     [fetchMessages],
   );
 
-  const handleSendMessage = async (chatId: string) => {
-    if (!messageInput.trim()) return;
+  const handleSendMessage = async (chatId: string, images?: string[]) => {
+    const hasText = messageInput.trim();
+    const hasImages = images && images.length > 0;
 
-    socket?.emit('send-message', { chatId, message: messageInput.trim() });
+    if (!hasText && !hasImages) return;
+
+    socket?.emit('send-message', { chatId, message: messageInput.trim(), images: images });
     setMessageInput('');
   };
 
@@ -150,7 +153,7 @@ const Messenger: React.FC = () => {
             ...chat,
             lastMessage: {
               sender: { id: newMsg.user.id, name: newMsg.user.name },
-              message: newMsg.content,
+              message: newMsg.content || (newMsg.images?.length ? '🖼 Đã gửi ảnh' : ''),
               time: newMsg.time,
             },
             time: newMsg.time,
@@ -187,7 +190,7 @@ const Messenger: React.FC = () => {
         caller: {
           id: user._id,
           name: user.name,
-          avatar: user.avatar, 
+          avatar: user.avatar,
         },
       });
     }

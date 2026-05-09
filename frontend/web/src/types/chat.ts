@@ -31,5 +31,6 @@ export interface Message {
   id: string;
   user: Member;
   content: string;
+  images: string[];
   time: string;
 }

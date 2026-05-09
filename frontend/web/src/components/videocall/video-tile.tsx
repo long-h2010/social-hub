@@ -16,6 +16,9 @@ const VideoTile: React.FC<Props> = React.forwardRef<HTMLDivElement, Props>(
   (props, ref) => {
     const { name, avatar, isMuted, isVideoOff, speaking, ...rest } = props;
 
+    // Kiểm tra avatar là URL ảnh hay emoji
+    const isImageUrl = avatar && (avatar.startsWith('http') || avatar.startsWith('/') || avatar.startsWith('data:'));
+
     return (
       <div
         className='relative w-full h-full rounded-2xl overflow-hidden transition-shadow duration-[400ms]'
@@ -27,29 +30,64 @@ const VideoTile: React.FC<Props> = React.forwardRef<HTMLDivElement, Props>(
         }}
         {...rest}
       >
-        {!isVideoOff && (
-          <div
-            ref={ref}
-            className='absolute inset-0'
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-            }}
-          />
-        )}
+        {/* Video container — luôn tồn tại trong DOM để Agora có thể attach */}
+        <div
+          ref={ref}
+          className='absolute inset-0'
+          style={{ display: isVideoOff ? 'none' : 'block' }}
+        />
+
+        {/* Overlay khi tắt camera */}
         {isVideoOff && (
-          <div className='absolute inset-0 flex flex-col items-center justify-center gap-2'>
-            <div
-              className='w-14 h-14 rounded-full flex items-center justify-center text-[26px] border-2 border-white/[0.08]'
-              style={{ background: 'linear-gradient(135deg,#2d3748,#1a202c)' }}
-            >
-              {avatar}
+          <div className='absolute inset-0 flex flex-col items-center justify-center gap-3'>
+            {/* Blurred avatar background */}
+            {isImageUrl && (
+              <div
+                className='absolute inset-0'
+                style={{
+                  backgroundImage: `url(${avatar})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: 'blur(24px) brightness(0.25) saturate(1.4)',
+                  transform: 'scale(1.1)',
+                }}
+              />
+            )}
+
+            {/* Avatar chính giữa */}
+            <div className='relative z-10 flex flex-col items-center gap-2.5'>
+              <div
+                className='rounded-full overflow-hidden border-2 border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)]'
+                style={{
+                  width: 'clamp(48px, 18%, 72px)',
+                  height: 'clamp(48px, 18%, 72px)',
+                }}
+              >
+                {isImageUrl ? (
+                  <img
+                    src={avatar}
+                    alt={name}
+                    className='w-full h-full object-cover'
+                  />
+                ) : (
+                  <div
+                    className='w-full h-full flex items-center justify-center text-3xl'
+                    style={{ background: 'linear-gradient(135deg,#2d3748,#1a202c)' }}
+                  >
+                    {avatar}
+                  </div>
+                )}
+              </div>
+              <span className='text-white/60 text-[11px] font-medium tracking-wide'>
+                {name}
+              </span>
             </div>
-            <span className='text-white/45 text-xs'>{name}</span>
           </div>
         )}
+
+        {/* Bottom bar: tên + mic status */}
         <div
-          className='absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2'
+          className='absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2 z-20'
           style={{
             background: 'linear-gradient(to top,rgba(0,0,0,0.65),transparent)',
           }}

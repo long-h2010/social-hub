@@ -9,7 +9,6 @@ import { Dashboard } from '@/pages/dashboard';
 import { UserCreate, UserEdit, UserList, UserShow } from '@/pages/users';
 import { PostCreate, PostEdit, PostList, PostShow } from '@/pages/posts';
 import { ReportEdit, ReportList, ReportShow } from '@/pages/reports';
-import Temp from '@/pages/temp';
 
 export const AppRoutes = () => {
   return (
@@ -30,7 +29,6 @@ export const AppRoutes = () => {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path='/temp' element={<Temp />} />
 
         <Route path={ResourceName.USERS}>
           <Route index element={<UserList />} />

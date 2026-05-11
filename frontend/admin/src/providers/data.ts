@@ -76,7 +76,7 @@ export const dataProvider = (
   },
 
   getOne: async ({ resource, id, meta }) => {
-    const { data } = await httpClient.get(`${apiUrl}${resource}/${id}`, {
+    const { data } = await httpClient.get(`${apiUrl}/${resource}/${id}`, {
       headers: meta?.headers,
     });
 
@@ -86,7 +86,7 @@ export const dataProvider = (
   },
 
   create: async ({ resource, variables, meta }) => {
-    const { data } = await httpClient.post(`${apiUrl}${resource}`, variables, {
+    const { data } = await httpClient.post(`${apiUrl}/${resource}`, variables, {
       headers: meta?.headers,
     });
     return { data: data.data || data };
@@ -94,7 +94,7 @@ export const dataProvider = (
 
   update: async ({ resource, id, variables, meta }) => {
     const { data } = await httpClient.put(
-      `${apiUrl}${resource}/${id}`,
+      `${apiUrl}/${resource}/${id}`,
       variables,
       { headers: meta?.headers },
     );
@@ -102,14 +102,14 @@ export const dataProvider = (
   },
 
   deleteOne: async ({ resource, id, meta }) => {
-    const { data } = await httpClient.delete(`${apiUrl}${resource}/${id}`, {
+    const { data } = await httpClient.delete(`${apiUrl}/${resource}/${id}`, {
       headers: meta?.headers,
     });
     return { data: data.data || data };
   },
 
   custom: async ({ url, method, payload, query, headers, meta }) => {
-    const requestUrl = url.startsWith('http') ? url : `${apiUrl}${url}`;
+    const requestUrl = url.startsWith('http') ? url : `${apiUrl}/${url}`;
 
     const { data } = await axiosInstance({
       url: requestUrl,

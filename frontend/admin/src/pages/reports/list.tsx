@@ -85,7 +85,7 @@ export const ReportList = () => {
   const runAI = async (content: string, reportId: number) => {
     await mutateAsync(
       {
-        url: `/reports/moderation`,
+        url: import.meta.env.VITE_APP_REPORTS_MODERATION_ENDPOINT,
         method: 'post',
         values: {
           content: content,
@@ -100,7 +100,7 @@ export const ReportList = () => {
           );
 
           updateReport({
-            resource: 'reports',
+            resource: import.meta.env.VITE_APP_REPORTS_ENDPOINT,
             id: reportId,
             values: { status: ReportStatus.PROCESSED, aiReview: aiReview },
             mutationMode: 'optimistic',

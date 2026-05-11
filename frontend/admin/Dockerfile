@@ -1,37 +1,35 @@
-# This Dockerfile uses `serve` npm package to serve the static files with node process.
-# You can find the Dockerfile for nginx in the following link:
-# https://github.com/refinedev/dockerfiles/blob/main/vite/Dockerfile.nginx
-FROM refinedev/node:18 AS base
+# =========================
+# Build
+# =========================
+FROM node:20-alpine AS builder
 
-FROM base as deps
+WORKDIR /app
 
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+COPY package*.json ./
 
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-FROM base as builder
-
-ENV NODE_ENV production
-
-COPY --from=deps /app/refine/node_modules ./node_modules
+# install deps 
+RUN npm ci
 
 COPY . .
 
+# build (tsc + refine build)
 RUN npm run build
 
-FROM base as runner
 
-ENV NODE_ENV production
+# =========================
+# Nginx
+# =========================
+FROM nginx:alpine
 
-RUN npm install -g serve
+# remove default config
+RUN rm -rf /etc/nginx/conf.d/default.conf
 
-COPY --from=builder /app/refine/dist ./
+# copy nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-USER refine
+# copy build output
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-CMD ["serve"]
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

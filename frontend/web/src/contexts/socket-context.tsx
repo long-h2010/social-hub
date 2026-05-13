@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './auth-context';
 import { useCall } from './call-context';
@@ -12,21 +12,31 @@ const SocketContext = createContext<SocketContextType | null>(null);
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { token, isAuthenticated } = useAuth();
-  const { callStatus, setCallStatus, setIncomingCall, setCallee } = useCall();
+  const { callStatus, setCallStatus, setIncomingCall } = useCall();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [onlines, setOnlines] = useState<string[]>([]);
 
+  const socketRef = useRef<Socket | null>(null);
+  const callStatusRef = useRef(callStatus);
+
+  useEffect(() => {
+    callStatusRef.current = callStatus;
+  }, [callStatus]);
+
   useEffect(() => {
     if (!isAuthenticated || !token) {
-      socket?.disconnect();
-      setSocket(null);
+      socketRef.current?.disconnect();
       return;
     }
 
     const newSocket = io(import.meta.env.VITE_APP_SOCKET_URL, {
       auth: { token },
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
     });
+
+    socketRef.current = newSocket;
 
     newSocket.on('online-list', (list: string[]) => {
       setOnlines(list);
@@ -46,7 +56,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     newSocket.on('ringing', (data) => {
-      if (callStatus !== 'idle') {
+      if (callStatusRef.current !== 'idle') {
         newSocket.emit('call-busy');
         return;
       }
@@ -55,8 +65,12 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setIncomingCall(data);
     });
 
-    newSocket.on('accept-call', (data) => {
-      setCallee(data.caller);
+    newSocket.on('accept-call', (data, callback) => {
+      // ✅ Callback trước, state sau
+      if (typeof callback === 'function') {
+        callback({ success: true });
+      }
+
       setIncomingCall(data);
       setCallStatus('in-call');
     });

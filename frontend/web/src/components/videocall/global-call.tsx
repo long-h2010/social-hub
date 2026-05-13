@@ -62,7 +62,7 @@ const GlobalCall = () => {
 
   return (
     <>
-      {openCallPopup && incomingCall && (
+      {openCallPopup && (
         <CallPopup
           isOpen={true}
           onClose={onClose}

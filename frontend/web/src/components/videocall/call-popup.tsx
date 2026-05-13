@@ -61,12 +61,6 @@ const CallPopup: React.FC<Props> = ({
   const timer = useTimer(connected);
 
   useEffect(() => {
-    if (callStatus === 'in-call') {
-      startCall();
-    }
-  }, [callStatus]);
-
-  useEffect(() => {
     clientRef.current = AGORA_CLIENT;
 
     AGORA_CLIENT.on(
@@ -141,6 +135,12 @@ const CallPopup: React.FC<Props> = ({
       console.error('Start Agora call failed:', err);
     }
   }, [APP_ID, incomingCall?.channel, incomingCall?.token, incomingCall?.uid]);
+  
+  useEffect(() => {
+    if (callStatus === 'in-call') {
+      startCall();
+    }
+  }, [callStatus, startCall]);
 
   const endCall = useCallback(async () => {
     if (endingRef.current) return;

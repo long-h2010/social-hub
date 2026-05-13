@@ -104,14 +104,39 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(`call:${body.channel}`);
 
-    this.server.to(`user:${body.callee}`).emit('accept-call', {
-      caller: body.caller,
-      channel: body.channel,
-      token: tokenAgora,
-      uid: uid,
-    });
+    const socketId = this.users.get(body.callee);
 
-    this.server.to(`user:${body.caller.id}`).emit('callee-accept');
+    if (!socketId) {
+      console.log('User offline');
+      return;
+    }
+
+    const targetSocket = this.server.sockets.sockets.get(socketId);
+
+    if (!targetSocket) {
+      console.log('Socket not found');
+      return;
+    }
+
+    targetSocket.timeout(10000).emit(
+      'accept-call',
+      {
+        caller: body.callee,
+        channel: body.channel,
+        token: tokenAgora,
+        uid,
+      },
+      (err, response) => {
+        if (err) {
+          console.log('ACK failed', err);
+          return;
+        }
+
+        console.log('ACK success', response);
+
+        this.server.to(`user:${body.caller.id}`).emit('callee-accept');
+      },
+    );
   }
 
   @SubscribeMessage('end-call')
